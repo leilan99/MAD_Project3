@@ -7,7 +7,9 @@
 
 import Foundation
 
-actor MealService {
+// had initial warnings of outdated code that Claude used so to fix it, we changed MealService to Sendable instead of actor. Per Swift doc, you can stil safely pass variables from one concurrency to another so it works for our solution.
+
+struct MealService: Sendable {
     static let shared = MealService()
     private let baseURL = "https://www.themealdb.com/api/json/v1/1"
 

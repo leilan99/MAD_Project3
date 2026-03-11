@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct HomeView: View {
-    @State private var featuredMeal: MealDTO?
+    @State private var featuredMeals: [MealDTO] = []
     @State private var categories: [CategoryDTO] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
@@ -16,20 +16,29 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    // Featured Recipe
-                    if let meal = featuredMeal {
-                        featuredSection(meal: meal)
-                    }
-
+                VStack(alignment: .center, spacing: 24) {
+                    // Welcome quote
+                    Text("Food always comes to those who love to cook.")
+                        .font(.subheadline.weight(.bold))
+                        .italic()
+                        .foregroundStyle(Color.orange)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.top, 4)
+                    
                     // Categories
                     if !categories.isEmpty {
                         categoriesSection
                     }
+                    
+                    // Featured Recipes
+                    if !featuredMeals.isEmpty {
+                        featuredSection
+                    }
+
                 }
                 .padding()
             }
-            .navigationTitle("Home")
+            .navigationTitle("Welcome")
             .overlay {
                 if isLoading {
                     ProgressView("Loading recipes...")
@@ -48,10 +57,10 @@ struct HomeView: View {
         }
     }
 
-    private func featuredSection(meal: MealDTO) -> some View {
+    private var featuredSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Featured Recipe")
+                Text("Featured Recipes")
                     .font(.title2.weight(.bold))
                 Spacer()
                 Button("Refresh") {
@@ -60,51 +69,53 @@ struct HomeView: View {
                 .font(.subheadline)
             }
 
-            NavigationLink(value: meal.idMeal) {
-                VStack(alignment: .leading, spacing: 0) {
-                    AsyncImage(url: URL(string: meal.strMealThumb ?? "")) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image.resizable().aspectRatio(contentMode: .fill)
-                        case .failure:
-                            Color.gray.opacity(0.3)
-                                .overlay {
-                                    Image(systemName: "photo")
+            ForEach(featuredMeals, id: \.idMeal) { meal in
+                NavigationLink(value: meal.idMeal) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        AsyncImage(url: URL(string: meal.strMealThumb ?? "")) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image.resizable().aspectRatio(contentMode: .fill)
+                            case .failure:
+                                Color.gray.opacity(0.3)
+                                    .overlay {
+                                        Image(systemName: "photo")
+                                            .foregroundStyle(.secondary)
+                                    }
+                            default:
+                                Color.gray.opacity(0.1)
+                                    .overlay { ProgressView() }
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 220)
+                        .clipped()
+                        .contentShape(Rectangle())
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(meal.strMeal)
+                                .font(.headline)
+                            HStack(spacing: 12) {
+                                if let category = meal.strCategory {
+                                    Label(category, systemImage: "tag.fill")
+                                        .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }
-                        default:
-                            Color.gray.opacity(0.1)
-                                .overlay { ProgressView() }
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 220)
-                    .clipped()
-                    .contentShape(Rectangle())
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(meal.strMeal)
-                            .font(.headline)
-                        HStack(spacing: 12) {
-                            if let category = meal.strCategory {
-                                Label(category, systemImage: "tag.fill")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            if let area = meal.strArea {
-                                Label(area, systemImage: "globe")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                if let area = meal.strArea {
+                                    Label(area, systemImage: "globe")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
                         }
+                        .padding(14)
                     }
-                    .padding(14)
+                    .background(Color(.systemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
                 }
-                .background(Color(.systemBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
             .navigationDestination(for: String.self) { mealId in
                 RecipeDetailView(mealId: mealId)
             }
@@ -116,33 +127,35 @@ struct HomeView: View {
             Text("Categories")
                 .font(.title2.weight(.bold))
 
-            LazyVGrid(columns: [
-                GridItem(.flexible(), spacing: 12),
-                GridItem(.flexible(), spacing: 12)
-            ], spacing: 12) {
-                ForEach(categories) { category in
-                    NavigationLink {
-                        CategoryMealsView(categoryName: category.strCategory)
-                    } label: {
-                        RecipeCard(
-                            title: category.strCategory,
-                            imageURL: category.strCategoryThumb
-                        )
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 12) {
+                    ForEach(categories) { category in
+                        NavigationLink {
+                            CategoryMealsView(categoryName: category.strCategory)
+                        } label: {
+                            Text(category.strCategory)
+                                .font(.subheadline.weight(.medium))
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(Color(.systemGray5))
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
         }
     }
 
     private func loadData() async {
+        guard featuredMeals.isEmpty else { return }
         isLoading = true
         errorMessage = nil
         do {
             async let fetchedCategories = MealService.shared.fetchCategories()
-            async let fetchedFeatured = MealService.shared.fetchRandomMeal()
+            async let fetchedFeatured = fetchRandomMeals()
             categories = try await fetchedCategories
-            featuredMeal = try await fetchedFeatured
+            featuredMeals = try await fetchedFeatured
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -151,9 +164,24 @@ struct HomeView: View {
 
     private func loadFeatured() async {
         do {
-            featuredMeal = try await MealService.shared.fetchRandomMeal()
+            featuredMeals = try await fetchRandomMeals()
         } catch {
-            // Keep the existing featured meal if refresh fails
+            // Keep the existing featured meals if refresh fails
+        }
+    }
+
+    private func fetchRandomMeals() async throws -> [MealDTO] {
+        try await withThrowingTaskGroup(of: MealDTO?.self) { group in
+            for _ in 0..<3 {
+                group.addTask {
+                    try await MealService.shared.fetchRandomMeal()
+                }
+            }
+            var meals: [MealDTO] = []
+            for try await meal in group {
+                if let meal { meals.append(meal) }
+            }
+            return meals
         }
     }
 }
