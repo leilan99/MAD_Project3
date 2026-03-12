@@ -104,11 +104,11 @@ struct RecipeDetailView: View {
                 tagsSection
             }
 
-            // Video
-            if let youtubeURL = meal.strYoutube, !youtubeURL.isEmpty,
-               let url = URL(string: youtubeURL) {
-                videoSection(url: url)
-            }
+//            // Video
+//            if let youtubeURL = meal.strYoutube, !youtubeURL.isEmpty,
+//               let url = URL(string: youtubeURL) {
+//                videoSection(url: url)
+//            }
 
             // Ingredients
             ingredientsSection(meal: meal)
@@ -158,30 +158,31 @@ struct RecipeDetailView: View {
         }
     }
 
-    private func videoSection(url: URL) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Video")
-                .font(.headline)
-
-            Link(destination: url) {
-                HStack {
-                    Image(systemName: "play.rectangle.fill")
-                        .font(.title2)
-                        .foregroundStyle(.red)
-                    Text("Watch on YouTube")
-                        .font(.subheadline.weight(.medium))
-                    Spacer()
-                    Image(systemName: "arrow.up.right")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(12)
-                .background(Color(.secondarySystemBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-            }
-            .buttonStyle(.plain)
-        }
-    }
+    //For later
+//    private func videoSection(url: URL) -> some View {
+//        VStack(alignment: .leading, spacing: 8) {
+//            Text("Video")
+//                .font(.headline)
+//
+//            Link(destination: url) {
+//                HStack {
+//                    Image(systemName: "play.rectangle.fill")
+//                        .font(.title2)
+//                        .foregroundStyle(.red)
+//                    Text("Watch on YouTube")
+//                        .font(.subheadline.weight(.medium))
+//                    Spacer()
+//                    Image(systemName: "arrow.up.right")
+//                        .font(.caption)
+//                        .foregroundStyle(.secondary)
+//                }
+//                .padding(12)
+//                .background(Color(.secondarySystemBackground))
+//                .clipShape(RoundedRectangle(cornerRadius: 10))
+//            }
+//            .buttonStyle(.plain)
+//        }
+//    }
 
     private func ingredientsSection(meal: MealDTO) -> some View {
         VStack(alignment: .leading, spacing: 12) {
