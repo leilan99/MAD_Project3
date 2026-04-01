@@ -36,7 +36,7 @@ struct RecipeDetailView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 if let meal {
                     Button {
-                        store.toggleSaved(meal: meal)
+                        Task { try? await store.toggleSaved(meal: meal) }
                     } label: {
                         Image(systemName: isSaved ? "heart.fill" : "heart")
                             .foregroundStyle(isSaved ? .red : .secondary)
@@ -105,7 +105,7 @@ struct RecipeDetailView: View {
                     Text("My Tags")
                         .font(.headline)
                     TagChipBar(tags: currentTags) { tag in
-                        store.toggleTag(tag, for: mealId)
+                        Task { try? await store.toggleTag(tag, for: mealId) }
                     }
                 }
             }

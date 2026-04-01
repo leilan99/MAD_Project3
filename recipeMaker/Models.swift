@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SwiftUI
 
 // MARK: - API Response Models
 
@@ -160,11 +161,11 @@ enum MealTag: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    var color: String {
+    var color: Color {
         switch self {
-        case .dinner: return "orange"
-        case .quick: return "blue"
-        case .healthy: return "green"
+        case .dinner: return .orange
+        case .quick: return .blue
+        case .healthy: return .green
         }
     }
 }
@@ -204,7 +205,9 @@ struct UserRecipe: Codable, Identifiable {
     var instructions: String
     var ingredients: [UserIngredient]
     var tags: Set<MealTag>
+    var imagePath: String?
     let dateCreated: Date
+    var dbId: Int?
 
     init(
         id: UUID = UUID(),
@@ -214,7 +217,9 @@ struct UserRecipe: Codable, Identifiable {
         instructions: String = "",
         ingredients: [UserIngredient] = [UserIngredient()],
         tags: Set<MealTag> = [],
-        dateCreated: Date = Date()
+        imagePath: String? = nil,
+        dateCreated: Date = Date(),
+        dbId: Int? = nil
     ) {
         self.id = id
         self.name = name
@@ -223,6 +228,8 @@ struct UserRecipe: Codable, Identifiable {
         self.instructions = instructions
         self.ingredients = ingredients
         self.tags = tags
+        self.imagePath = imagePath
         self.dateCreated = dateCreated
+        self.dbId = dbId
     }
 }

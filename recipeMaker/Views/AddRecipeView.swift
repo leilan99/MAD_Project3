@@ -5,6 +5,7 @@
 //  Created by Leila Nunez on 3/9/26.
 //
 
+import PhotosUI
 import SwiftUI
 
 struct AddRecipeView: View {
@@ -19,6 +20,8 @@ struct AddRecipeView: View {
     @State private var instructions = ""
     @State private var ingredients: [UserIngredient] = [UserIngredient()]
     @State private var selectedTags: Set<MealTag> = []
+    @State private var selectedPhoto: PhotosPickerItem?
+    @State private var imageData: Data?
 
     private var isValid: Bool {
         !name.trimmingCharacters(in: .whitespaces).isEmpty &&
@@ -32,6 +35,45 @@ struct AddRecipeView: View {
                     TextField("Recipe Name", text: $name)
                     TextField("Category (e.g. Dessert)", text: $category)
                     TextField("Cuisine (e.g. Italian)", text: $area)
+                }
+
+                Section("Photo") {
+                    if let imageData, let uiImage = UIImage(data: imageData) {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 200)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                    }
+
+                    PhotosPicker(
+                        selection: $selectedPhoto,
+                        matching: .images,
+                        photoLibrary: .shared()
+                    ) {
+                        Label(
+                            imageData != nil ? "Change Photo" : "Add Photo",
+                            systemImage: imageData != nil ? "photo.badge.arrow.down" : "photo.badge.plus"
+                        )
+                    }
+                    .onChange(of: selectedPhoto) { _, newItem in
+                        Task {
+                            if let data = try? await newItem?.loadTransferable(type: Data.self) {
+                                imageData = data
+                            }
+                        }
+                    }
+
+                    if imageData != nil {
+                        Button(role: .destructive) {
+                            imageData = nil
+                            selectedPhoto = nil
+                        } label: {
+                            Label("Remove Photo", systemImage: "trash")
+                        }
+                    }
                 }
 
                 Section {
@@ -77,8 +119,10 @@ struct AddRecipeView: View {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { saveRecipe() }
-                        .disabled(!isValid)
+                    Button("Save") {
+                        Task { await saveRecipe() }
+                    }
+                    .disabled(!isValid)
                 }
             }
             .onAppear {
@@ -89,12 +133,16 @@ struct AddRecipeView: View {
                     instructions = existingRecipe.instructions
                     ingredients = existingRecipe.ingredients
                     selectedTags = existingRecipe.tags
+                    if let path = existingRecipe.imagePath,
+                       let uiImage = store.loadImage(path: path) {
+                        imageData = uiImage.jpegData(compressionQuality: 1.0)
+                    }
                 }
             }
         }
     }
 
-    private func saveRecipe() {
+    private func saveRecipe() async {
         let cleanedIngredients = ingredients.filter {
             !$0.name.trimmingCharacters(in: .whitespaces).isEmpty
         }
@@ -107,17 +155,36 @@ struct AddRecipeView: View {
             updated.instructions = instructions
             updated.ingredients = cleanedIngredients
             updated.tags = selectedTags
-            store.updateUserRecipe(updated)
+
+            // Handle image changes
+            if let imageData {
+                if let oldPath = existingRecipe.imagePath {
+                    try? await store.deleteStorageImage(path: oldPath)
+                }
+                updated.imagePath = try? await store.saveImage(imageData, for: existingRecipe.id)
+            } else if existingRecipe.imagePath != nil {
+                try? await store.deleteStorageImage(path: existingRecipe.imagePath!)
+                updated.imagePath = nil
+            }
+
+            try? await store.updateUserRecipe(updated)
         } else {
+            let recipeId = UUID()
+            var imagePath: String?
+            if let imageData {
+                imagePath = try? await store.saveImage(imageData, for: recipeId)
+            }
             let recipe = UserRecipe(
+                id: recipeId,
                 name: name.trimmingCharacters(in: .whitespaces),
                 category: category.trimmingCharacters(in: .whitespaces),
                 area: area.trimmingCharacters(in: .whitespaces),
                 instructions: instructions,
                 ingredients: cleanedIngredients,
-                tags: selectedTags
+                tags: selectedTags,
+                imagePath: imagePath
             )
-            store.addUserRecipe(recipe)
+            try? await store.addUserRecipe(recipe)
         }
         dismiss()
     }

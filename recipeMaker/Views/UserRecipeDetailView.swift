@@ -24,19 +24,29 @@ struct UserRecipeDetailView: View {
         ScrollView {
             if let recipe {
                 VStack(alignment: .leading, spacing: 0) {
-                    // Placeholder header
-                    ZStack {
-                        LinearGradient(
-                            colors: [.orange.opacity(0.3), .orange.opacity(0.1)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                        Image(systemName: "fork.knife.circle.fill")
-                            .font(.system(size: 60))
-                            .foregroundStyle(.orange.opacity(0.5))
+                    // Header image
+                    if let imagePath = recipe.imagePath,
+                       let uiImage = store.loadImage(path: imagePath) {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 280)
+                            .clipped()
+                    } else {
+                        ZStack {
+                            LinearGradient(
+                                colors: [.orange.opacity(0.3), .orange.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                            Image(systemName: "fork.knife.circle.fill")
+                                .font(.system(size: 60))
+                                .foregroundStyle(.orange.opacity(0.5))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 200)
                     }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 200)
 
                     VStack(alignment: .leading, spacing: 20) {
                         // Title & Meta
@@ -71,7 +81,7 @@ struct UserRecipeDetailView: View {
                             Text("My Tags")
                                 .font(.headline)
                             TagChipBar(tags: currentTags) { tag in
-                                store.toggleUserRecipeTag(tag, for: recipeId)
+                                Task { try? await store.toggleUserRecipeTag(tag, for: recipeId) }
                             }
                         }
 

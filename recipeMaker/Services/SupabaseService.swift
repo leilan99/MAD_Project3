@@ -21,24 +21,25 @@ struct SupabaseService: Sendable {
     private init() {}
 }
 
-// MARK: - Database DTOs
+// MARK: - Database DTOs (matched to actual Supabase schema)
 
-struct SavedRecipeDTO: Codable {
+// saved_recipes: id (bigint auto), recipe_id (text), recipe_name (text),
+//   thumb_url, category, area, date_saved, user_id (uuid), tags (text[])
+
+struct SavedRecipeRow: Codable {
     let id: Int?
-    let userId: UUID
-    let mealId: String
-    let name: String
+    let recipeId: String
+    let recipeName: String
     let thumbUrl: String?
     let category: String?
     let area: String?
     let tags: [String]
-    let dateSaved: Date
+    let dateSaved: String?
 
     enum CodingKeys: String, CodingKey {
         case id
-        case userId = "user_id"
-        case mealId = "meal_id"
-        case name
+        case recipeId = "recipe_id"
+        case recipeName = "recipe_name"
         case thumbUrl = "thumb_url"
         case category
         case area
@@ -48,45 +49,62 @@ struct SavedRecipeDTO: Codable {
 
     func toDomain() -> SavedRecipe {
         SavedRecipe(
-            mealId: mealId,
-            name: name,
+            mealId: recipeId,
+            name: recipeName,
             thumbURL: thumbUrl,
             category: category,
             area: area,
             tags: Set(tags.compactMap { MealTag(rawValue: $0) }),
-            dateSaved: dateSaved
-        )
-    }
-
-    static func from(domain: SavedRecipe, userId: UUID) -> SavedRecipeDTO {
-        SavedRecipeDTO(
-            id: nil,
-            userId: userId,
-            mealId: domain.mealId,
-            name: domain.name,
-            thumbUrl: domain.thumbURL,
-            category: domain.category,
-            area: domain.area,
-            tags: domain.tags.map { $0.rawValue },
-            dateSaved: domain.dateSaved
+            dateSaved: Date()
         )
     }
 }
 
-struct UserRecipeDTO: Codable {
-    let id: UUID
-    let userId: UUID
+/// For INSERT — omit id (auto-generated) and user_id (defaults to auth.uid())
+struct SavedRecipeInsert: Codable {
+    let recipeId: String
+    let recipeName: String
+    let thumbUrl: String?
+    let category: String?
+    let area: String?
+    let tags: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case recipeId = "recipe_id"
+        case recipeName = "recipe_name"
+        case thumbUrl = "thumb_url"
+        case category
+        case area
+        case tags
+    }
+
+    static func from(domain: SavedRecipe) -> SavedRecipeInsert {
+        SavedRecipeInsert(
+            recipeId: domain.mealId,
+            recipeName: domain.name,
+            thumbUrl: domain.thumbURL,
+            category: domain.category,
+            area: domain.area,
+            tags: domain.tags.map { $0.rawValue }
+        )
+    }
+}
+
+// user_recipes: id (bigint auto), name, category, area, instructions,
+//   image_path, date_created, user_id (uuid), tags (text[])
+
+struct UserRecipeRow: Codable {
+    let id: Int
     let name: String
     let category: String
     let area: String
     let instructions: String
     let imagePath: String?
     let tags: [String]
-    let dateCreated: Date
+    let dateCreated: String?
 
     enum CodingKeys: String, CodingKey {
         case id
-        case userId = "user_id"
         case name
         case category
         case area
@@ -98,39 +116,57 @@ struct UserRecipeDTO: Codable {
 
     func toDomain(ingredients: [UserIngredient]) -> UserRecipe {
         UserRecipe(
-            id: id,
+            id: UUID(), // local ID — DB uses bigint
             name: name,
             category: category,
             area: area,
             instructions: instructions,
             ingredients: ingredients,
             tags: Set(tags.compactMap { MealTag(rawValue: $0) }),
-            imagePath: imagePath,
-            dateCreated: dateCreated
+            imagePath: imagePath?.isEmpty == true ? nil : imagePath,
+            dateCreated: Date(),
+            dbId: id
         )
     }
+}
 
-    static func from(domain: UserRecipe, userId: UUID) -> UserRecipeDTO {
-        UserRecipeDTO(
-            id: domain.id,
-            userId: userId,
+struct UserRecipeInsert: Codable {
+    let name: String
+    let category: String
+    let area: String
+    let instructions: String
+    let imagePath: String?
+    let tags: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case name
+        case category
+        case area
+        case instructions
+        case imagePath = "image_path"
+        case tags
+    }
+
+    static func from(domain: UserRecipe) -> UserRecipeInsert {
+        UserRecipeInsert(
             name: domain.name,
             category: domain.category,
             area: domain.area,
             instructions: domain.instructions,
             imagePath: domain.imagePath,
-            tags: domain.tags.map { $0.rawValue },
-            dateCreated: domain.dateCreated
+            tags: domain.tags.map { $0.rawValue }
         )
     }
 }
 
-struct UserIngredientDTO: Codable {
-    let id: UUID
-    let recipeId: UUID
+// user_ingredients: id (bigint auto), recipe_id (bigint FK), name, measure, sort_order, user_id
+
+struct UserIngredientRow: Codable {
+    let id: Int
+    let recipeId: Int
     let name: String
     let measure: String
-    let sortOrder: Int
+    let sortOrder: Int?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -141,12 +177,25 @@ struct UserIngredientDTO: Codable {
     }
 
     func toDomain() -> UserIngredient {
-        UserIngredient(id: id, name: name, measure: measure)
+        UserIngredient(name: name, measure: measure)
+    }
+}
+
+struct UserIngredientInsert: Codable {
+    let recipeId: Int
+    let name: String
+    let measure: String
+    let sortOrder: Int
+
+    enum CodingKeys: String, CodingKey {
+        case recipeId = "recipe_id"
+        case name
+        case measure
+        case sortOrder = "sort_order"
     }
 
-    static func from(domain: UserIngredient, recipeId: UUID, sortOrder: Int) -> UserIngredientDTO {
-        UserIngredientDTO(
-            id: domain.id,
+    static func from(domain: UserIngredient, recipeId: Int, sortOrder: Int) -> UserIngredientInsert {
+        UserIngredientInsert(
             recipeId: recipeId,
             name: domain.name,
             measure: domain.measure,
@@ -160,20 +209,20 @@ struct UserIngredientDTO: Codable {
 extension SupabaseService {
 
     func fetchSavedRecipes(userId: UUID) async throws -> [SavedRecipe] {
-        let dtos: [SavedRecipeDTO] = try await client
+        let rows: [SavedRecipeRow] = try await client
             .from("saved_recipes")
             .select()
             .eq("user_id", value: userId)
             .execute()
             .value
-        return dtos.map { $0.toDomain() }
+        return rows.map { $0.toDomain() }
     }
 
     func insertSavedRecipe(_ recipe: SavedRecipe, userId: UUID) async throws {
-        let dto = SavedRecipeDTO.from(domain: recipe, userId: userId)
+        let insert = SavedRecipeInsert.from(domain: recipe)
         try await client
             .from("saved_recipes")
-            .insert(dto)
+            .insert(insert)
             .execute()
     }
 
@@ -181,7 +230,7 @@ extension SupabaseService {
         try await client
             .from("saved_recipes")
             .delete()
-            .eq("meal_id", value: mealId)
+            .eq("recipe_id", value: mealId)
             .eq("user_id", value: userId)
             .execute()
     }
@@ -190,7 +239,7 @@ extension SupabaseService {
         try await client
             .from("saved_recipes")
             .update(["tags": tags.map { $0.rawValue }])
-            .eq("meal_id", value: mealId)
+            .eq("recipe_id", value: mealId)
             .eq("user_id", value: userId)
             .execute()
     }
@@ -201,17 +250,17 @@ extension SupabaseService {
 extension SupabaseService {
 
     func fetchUserRecipes(userId: UUID) async throws -> [UserRecipe] {
-        let recipeDTOs: [UserRecipeDTO] = try await client
+        let recipeRows: [UserRecipeRow] = try await client
             .from("user_recipes")
             .select()
             .eq("user_id", value: userId)
             .execute()
             .value
 
-        guard !recipeDTOs.isEmpty else { return [] }
+        guard !recipeRows.isEmpty else { return [] }
 
-        let recipeIds = recipeDTOs.map { $0.id }
-        let ingredientDTOs: [UserIngredientDTO] = try await client
+        let recipeIds = recipeRows.map { $0.id }
+        let ingredientRows: [UserIngredientRow] = try await client
             .from("user_ingredients")
             .select()
             .in("recipe_id", values: recipeIds)
@@ -219,38 +268,51 @@ extension SupabaseService {
             .execute()
             .value
 
-        let ingredientsByRecipe = Dictionary(grouping: ingredientDTOs) { $0.recipeId }
+        let ingredientsByRecipe = Dictionary(grouping: ingredientRows) { $0.recipeId }
 
-        return recipeDTOs.map { dto in
-            let ingredients = (ingredientsByRecipe[dto.id] ?? []).map { $0.toDomain() }
-            return dto.toDomain(ingredients: ingredients)
+        return recipeRows.map { row in
+            let ingredients = (ingredientsByRecipe[row.id] ?? []).map { $0.toDomain() }
+            return row.toDomain(ingredients: ingredients)
         }
     }
 
-    func insertUserRecipe(_ recipe: UserRecipe, userId: UUID) async throws {
-        let dto = UserRecipeDTO.from(domain: recipe, userId: userId)
-        try await client
+    /// Inserts recipe and returns the auto-generated DB id
+    func insertUserRecipe(_ recipe: UserRecipe, userId: UUID) async throws -> Int {
+        let insert = UserRecipeInsert.from(domain: recipe)
+        let inserted: [UserRecipeRow] = try await client
             .from("user_recipes")
-            .insert(dto)
+            .insert(insert)
+            .select()
             .execute()
+            .value
 
-        let ingredientDTOs = recipe.ingredients.enumerated().map { index, ing in
-            UserIngredientDTO.from(domain: ing, recipeId: recipe.id, sortOrder: index)
+        guard let dbId = inserted.first?.id else {
+            throw NSError(domain: "SupabaseService", code: 0, userInfo: [NSLocalizedDescriptionKey: "No id returned from insert"])
         }
-        if !ingredientDTOs.isEmpty {
+
+        let ingredientInserts = recipe.ingredients
+            .filter { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty }
+            .enumerated()
+            .map { index, ing in
+                UserIngredientInsert.from(domain: ing, recipeId: dbId, sortOrder: index)
+            }
+        if !ingredientInserts.isEmpty {
             try await client
                 .from("user_ingredients")
-                .insert(ingredientDTOs)
+                .insert(ingredientInserts)
                 .execute()
         }
+
+        return dbId
     }
 
     func updateUserRecipe(_ recipe: UserRecipe, userId: UUID) async throws {
-        let dto = UserRecipeDTO.from(domain: recipe, userId: userId)
+        guard let dbId = recipe.dbId else { return }
+        let insert = UserRecipeInsert.from(domain: recipe)
         try await client
             .from("user_recipes")
-            .update(dto)
-            .eq("id", value: recipe.id)
+            .update(insert)
+            .eq("id", value: dbId)
             .eq("user_id", value: userId)
             .execute()
 
@@ -258,40 +320,43 @@ extension SupabaseService {
         try await client
             .from("user_ingredients")
             .delete()
-            .eq("recipe_id", value: recipe.id)
+            .eq("recipe_id", value: dbId)
             .execute()
 
-        let ingredientDTOs = recipe.ingredients.enumerated().map { index, ing in
-            UserIngredientDTO.from(domain: ing, recipeId: recipe.id, sortOrder: index)
-        }
-        if !ingredientDTOs.isEmpty {
+        let ingredientInserts = recipe.ingredients
+            .filter { !$0.name.trimmingCharacters(in: .whitespaces).isEmpty }
+            .enumerated()
+            .map { index, ing in
+                UserIngredientInsert.from(domain: ing, recipeId: dbId, sortOrder: index)
+            }
+        if !ingredientInserts.isEmpty {
             try await client
                 .from("user_ingredients")
-                .insert(ingredientDTOs)
+                .insert(ingredientInserts)
                 .execute()
         }
     }
 
-    func deleteUserRecipe(id: UUID, userId: UUID) async throws {
+    func deleteUserRecipe(dbId: Int, userId: UUID) async throws {
         try await client
             .from("user_ingredients")
             .delete()
-            .eq("recipe_id", value: id)
+            .eq("recipe_id", value: dbId)
             .execute()
 
         try await client
             .from("user_recipes")
             .delete()
-            .eq("id", value: id)
+            .eq("id", value: dbId)
             .eq("user_id", value: userId)
             .execute()
     }
 
-    func updateUserRecipeTags(id: UUID, tags: Set<MealTag>, userId: UUID) async throws {
+    func updateUserRecipeTags(dbId: Int, tags: Set<MealTag>, userId: UUID) async throws {
         try await client
             .from("user_recipes")
             .update(["tags": tags.map { $0.rawValue }])
-            .eq("id", value: id)
+            .eq("id", value: dbId)
             .eq("user_id", value: userId)
             .execute()
     }

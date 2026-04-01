@@ -1,11 +1,127 @@
 //
-//  AsyncImageView.swift
+//  Components.swift
 //  recipeMaker
 //
 //  Created by Leila Nunez on 3/9/26.
 //
 
 import SwiftUI
+
+// MARK: - Tag Chip Bar
+
+struct TagChipBar: View {
+    let tags: Set<MealTag>
+    let onToggle: (MealTag) -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(MealTag.allCases) { tag in
+                let isActive = tags.contains(tag)
+                Button {
+                    onToggle(tag)
+                } label: {
+                    Label(tag.rawValue, systemImage: tag.icon)
+                        .font(.caption.weight(.medium))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(isActive ? tag.color.opacity(0.2) : Color.gray.opacity(0.1))
+                        .foregroundStyle(isActive ? tag.color : .secondary)
+                        .clipShape(Capsule())
+                        .overlay(
+                            Capsule()
+                                .strokeBorder(isActive ? tag.color : .clear, lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+}
+
+// MARK: - Ingredients Section
+
+struct IngredientsSection: View {
+    let items: [(name: String, measure: String)]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Ingredients")
+                .font(.headline)
+
+            VStack(spacing: 0) {
+                ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                    HStack {
+                        Text(item.name)
+                            .font(.body)
+                        Spacer()
+                        Text(item.measure)
+                            .font(.body)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 10)
+                    .padding(.horizontal, 12)
+                    .background(index % 2 == 0 ? Color(.secondarySystemBackground) : Color.clear)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .strokeBorder(Color(.separator), lineWidth: 0.5)
+            )
+        }
+    }
+}
+
+// MARK: - Instructions Section
+
+struct InstructionsSection: View {
+    let instructions: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Instructions")
+                .font(.headline)
+
+            Text(instructions)
+                .font(.body)
+                .lineSpacing(4)
+        }
+    }
+}
+
+// MARK: - Filtered Meals List
+
+struct FilteredMealsView: View {
+    let title: String
+    let fetch: () async throws -> [MealSummaryDTO]
+    @State private var meals: [MealSummaryDTO] = []
+    @State private var isLoading = true
+
+    var body: some View {
+        List(meals) { meal in
+            NavigationLink {
+                RecipeDetailView(mealId: meal.idMeal)
+            } label: {
+                MealListRow(title: meal.strMeal, imageURL: meal.strMealThumb)
+            }
+        }
+        .navigationTitle(title)
+        .overlay {
+            if isLoading { ProgressView() }
+            if !isLoading && meals.isEmpty {
+                ContentUnavailableView("No Recipes", systemImage: "fork.knife", description: Text("No recipes found for \(title)."))
+            }
+        }
+        .task {
+            do {
+                meals = try await fetch()
+            } catch {}
+            isLoading = false
+        }
+    }
+}
+
+// MARK: - Recipe Card
 
 struct RecipeCard: View {
     let title: String

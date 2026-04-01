@@ -9,6 +9,7 @@ import SwiftUI
 
 struct CookbookView: View {
     @Environment(CookbookStore.self) private var store
+    @Environment(AuthViewModel.self) private var authViewModel
     @State private var filterTag: MealTag?
     @State private var showAddRecipeSheet = false
 
@@ -97,8 +98,17 @@ struct CookbookView: View {
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    if hasAnyRecipes {
-                        EditButton()
+                    Menu {
+                        if hasAnyRecipes {
+                            EditButton()
+                        }
+                        Button(role: .destructive) {
+                            Task { await authViewModel.signOut() }
+                        } label: {
+                            Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
                     }
                 }
             }
@@ -194,14 +204,24 @@ struct CookbookView: View {
 
     private func userRecipeRow(recipe: UserRecipe) -> some View {
         HStack(spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.orange.opacity(0.15))
-                Image(systemName: "fork.knife")
-                    .font(.title3)
-                    .foregroundStyle(.orange)
+            Group {
+                if let imagePath = recipe.imagePath,
+                   let uiImage = store.loadImage(path: imagePath) {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } else {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.orange.opacity(0.15))
+                        Image(systemName: "fork.knife")
+                            .font(.title3)
+                            .foregroundStyle(.orange)
+                    }
+                }
             }
             .frame(width: 60, height: 60)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(recipe.name)
@@ -239,14 +259,14 @@ struct CookbookView: View {
     private func deleteUserRecipes(at offsets: IndexSet) {
         let recipesToDelete = offsets.map { filteredUserRecipes[$0] }
         for recipe in recipesToDelete {
-            store.removeUserRecipe(id: recipe.id)
+            Task { try? await store.removeUserRecipe(id: recipe.id) }
         }
     }
 
     private func deleteRecipes(at offsets: IndexSet) {
         let recipesToDelete = offsets.map { filteredRecipes[$0] }
         for recipe in recipesToDelete {
-            store.remove(mealId: recipe.mealId)
+            Task { try? await store.remove(mealId: recipe.mealId) }
         }
     }
 }

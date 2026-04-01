@@ -133,7 +133,7 @@ struct RandomDinnerView: View {
             HStack {
                 Spacer()
                 Button {
-                    store.toggleSaved(meal: meal)
+                    Task { try? await store.toggleSaved(meal: meal) }
                 } label: {
                     Image(systemName: store.isSaved(mealId: meal.idMeal) ? "heart.fill" : "heart")
                         .font(.title3)
