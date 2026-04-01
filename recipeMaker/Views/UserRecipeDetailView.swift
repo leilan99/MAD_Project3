@@ -67,13 +67,25 @@ struct UserRecipeDetailView: View {
                                 }
                             }
 
-                            Label("My Recipe", systemImage: "person.fill")
-                                .font(.caption.weight(.medium))
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 4)
-                                .background(Color.orange.opacity(0.15))
-                                .foregroundStyle(.orange)
-                                .clipShape(Capsule())
+                            HStack(spacing: 8) {
+                                Label("My Recipe", systemImage: "person.fill")
+                                    .font(.caption.weight(.medium))
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 4)
+                                    .background(Color.orange.opacity(0.15))
+                                    .foregroundStyle(.orange)
+                                    .clipShape(Capsule())
+
+                                if recipe.shared {
+                                    Label("Shared", systemImage: "person.2.fill")
+                                        .font(.caption.weight(.medium))
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 4)
+                                        .background(Color.blue.opacity(0.15))
+                                        .foregroundStyle(.blue)
+                                        .clipShape(Capsule())
+                                }
+                            }
                         }
 
                         // Tags
@@ -103,10 +115,18 @@ struct UserRecipeDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    showEditSheet = true
-                } label: {
-                    Image(systemName: "pencil")
+                HStack(spacing: 16) {
+                    Button {
+                        Task { try? await store.toggleShared(for: recipeId) }
+                    } label: {
+                        Image(systemName: recipe?.shared == true ? "person.2.fill" : "person.2")
+                            .foregroundStyle(recipe?.shared == true ? .orange : .secondary)
+                    }
+                    Button {
+                        showEditSheet = true
+                    } label: {
+                        Image(systemName: "pencil")
+                    }
                 }
             }
         }

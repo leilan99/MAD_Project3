@@ -102,6 +102,7 @@ struct UserRecipeRow: Codable {
     let imagePath: String?
     let tags: [String]
     let dateCreated: String?
+    let shared: Bool?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -112,11 +113,12 @@ struct UserRecipeRow: Codable {
         case imagePath = "image_path"
         case tags
         case dateCreated = "date_created"
+        case shared
     }
 
     func toDomain(ingredients: [UserIngredient]) -> UserRecipe {
         UserRecipe(
-            id: UUID(), // local ID — DB uses bigint
+            id: UUID(),
             name: name,
             category: category,
             area: area,
@@ -125,7 +127,8 @@ struct UserRecipeRow: Codable {
             tags: Set(tags.compactMap { MealTag(rawValue: $0) }),
             imagePath: imagePath?.isEmpty == true ? nil : imagePath,
             dateCreated: Date(),
-            dbId: id
+            dbId: id,
+            shared: shared ?? false
         )
     }
 }
@@ -137,6 +140,7 @@ struct UserRecipeInsert: Codable {
     let instructions: String
     let imagePath: String?
     let tags: [String]
+    let shared: Bool
 
     enum CodingKeys: String, CodingKey {
         case name
@@ -145,6 +149,7 @@ struct UserRecipeInsert: Codable {
         case instructions
         case imagePath = "image_path"
         case tags
+        case shared
     }
 
     static func from(domain: UserRecipe) -> UserRecipeInsert {
@@ -154,7 +159,8 @@ struct UserRecipeInsert: Codable {
             area: domain.area,
             instructions: domain.instructions,
             imagePath: domain.imagePath,
-            tags: domain.tags.map { $0.rawValue }
+            tags: domain.tags.map { $0.rawValue },
+            shared: domain.shared
         )
     }
 }
@@ -356,6 +362,47 @@ extension SupabaseService {
         try await client
             .from("user_recipes")
             .update(["tags": tags.map { $0.rawValue }])
+            .eq("id", value: dbId)
+            .eq("user_id", value: userId)
+            .execute()
+    }
+}
+
+// MARK: - Community (Shared) Recipes
+
+extension SupabaseService {
+
+    func fetchSharedRecipes() async throws -> [UserRecipe] {
+        let recipeRows: [UserRecipeRow] = try await client
+            .from("user_recipes")
+            .select()
+            .eq("shared", value: true)
+            .execute()
+            .value
+
+        guard !recipeRows.isEmpty else { return [] }
+
+        let recipeIds = recipeRows.map { $0.id }
+        let ingredientRows: [UserIngredientRow] = try await client
+            .from("user_ingredients")
+            .select()
+            .in("recipe_id", values: recipeIds)
+            .order("sort_order")
+            .execute()
+            .value
+
+        let ingredientsByRecipe = Dictionary(grouping: ingredientRows) { $0.recipeId }
+
+        return recipeRows.map { row in
+            let ingredients = (ingredientsByRecipe[row.id] ?? []).map { $0.toDomain() }
+            return row.toDomain(ingredients: ingredients)
+        }
+    }
+
+    func toggleShared(dbId: Int, shared: Bool, userId: UUID) async throws {
+        try await client
+            .from("user_recipes")
+            .update(["shared": shared])
             .eq("id", value: dbId)
             .eq("user_id", value: userId)
             .execute()

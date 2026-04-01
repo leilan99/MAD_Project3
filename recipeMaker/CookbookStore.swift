@@ -13,6 +13,7 @@ import UIKit
 final class CookbookStore {
     var savedRecipes: [SavedRecipe] = []
     var userRecipes: [UserRecipe] = []
+    var communityRecipes: [UserRecipe] = []
     var userId: UUID?
 
     private let service = SupabaseService.shared
@@ -128,6 +129,40 @@ final class CookbookStore {
 
     func userRecipeTags(for recipeId: UUID) -> Set<MealTag> {
         userRecipes.first { $0.id == recipeId }?.tags ?? []
+    }
+
+    // MARK: - Community (Shared) Recipes
+
+    func loadCommunityRecipes() async throws {
+        let recipes = try await service.fetchSharedRecipes()
+        await MainActor.run {
+            self.communityRecipes = recipes
+        }
+    }
+
+    func toggleShared(for recipeId: UUID) async throws {
+        guard let userId,
+              let index = userRecipes.firstIndex(where: { $0.id == recipeId }),
+              let dbId = userRecipes[index].dbId else { return }
+        userRecipes[index].shared.toggle()
+        try await service.toggleShared(dbId: dbId, shared: userRecipes[index].shared, userId: userId)
+    }
+
+    func saveAsCopy(_ recipe: UserRecipe) async throws {
+        guard userId != nil else { return }
+        var copy = UserRecipe(
+            name: recipe.name,
+            category: recipe.category,
+            area: recipe.area,
+            instructions: recipe.instructions,
+            ingredients: recipe.ingredients,
+            tags: [],
+            imagePath: nil,
+            shared: false
+        )
+        let dbId = try await service.insertUserRecipe(copy, userId: userId!)
+        copy.dbId = dbId
+        userRecipes.append(copy)
     }
 
     // MARK: - Recipe Images

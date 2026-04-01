@@ -208,6 +208,7 @@ struct UserRecipe: Codable, Identifiable {
     var imagePath: String?
     let dateCreated: Date
     var dbId: Int?
+    var shared: Bool
 
     init(
         id: UUID = UUID(),
@@ -219,7 +220,8 @@ struct UserRecipe: Codable, Identifiable {
         tags: Set<MealTag> = [],
         imagePath: String? = nil,
         dateCreated: Date = Date(),
-        dbId: Int? = nil
+        dbId: Int? = nil,
+        shared: Bool = false
     ) {
         self.id = id
         self.name = name
@@ -231,5 +233,6 @@ struct UserRecipe: Codable, Identifiable {
         self.imagePath = imagePath
         self.dateCreated = dateCreated
         self.dbId = dbId
+        self.shared = shared
     }
 }

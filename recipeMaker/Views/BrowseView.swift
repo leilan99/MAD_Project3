@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct BrowseView: View {
+    @Environment(CookbookStore.self) private var store
     @State private var areas: [AreaDTO] = []
     @State private var ingredients: [IngredientDTO] = []
     @State private var searchText = ""
@@ -21,6 +22,9 @@ struct BrowseView: View {
                 if !searchResults.isEmpty {
                     searchResultsSection
                 } else if searchText.isEmpty {
+                    if !store.communityRecipes.isEmpty {
+                        communitySection
+                    }
                     cuisinesSection
                     ingredientsSection
                 }
@@ -45,6 +49,34 @@ struct BrowseView: View {
             }
             .task {
                 await loadBrowseData()
+                try? await store.loadCommunityRecipes()
+            }
+        }
+    }
+
+    private var communitySection: some View {
+        Section("Community Recipes") {
+            ForEach(store.communityRecipes) { recipe in
+                NavigationLink {
+                    CommunityRecipeDetailView(recipe: recipe)
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "person.2.circle.fill")
+                            .font(.title3)
+                            .foregroundStyle(.blue)
+                            .frame(width: 36, height: 36)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(recipe.name)
+                                .font(.body)
+                            Text([recipe.category, recipe.area]
+                                .filter { !$0.isEmpty }
+                                .joined(separator: " · "))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
             }
         }
     }
