@@ -60,8 +60,12 @@ struct AddRecipeView: View {
                     }
                     .onChange(of: selectedPhoto) { _, newItem in
                         Task {
-                            if let data = try? await newItem?.loadTransferable(type: Data.self) {
-                                imageData = data
+                            guard let newItem else { return }
+                            if let data = try? await newItem.loadTransferable(type: Data.self),
+                               let uiImage = UIImage(data: data),
+                               let jpegData = uiImage.jpegData(compressionQuality: 0.9) {
+                                // Convert to JPEG to guarantee a usable format
+                                imageData = jpegData
                             }
                         }
                     }
@@ -161,7 +165,7 @@ struct AddRecipeView: View {
                 if let oldPath = existingRecipe.imagePath {
                     try? await store.deleteStorageImage(path: oldPath)
                 }
-                updated.imagePath = try? await store.saveImage(imageData, for: existingRecipe.id)
+                updated.imagePath = await store.saveImage(imageData, for: existingRecipe.id)
             } else if existingRecipe.imagePath != nil {
                 try? await store.deleteStorageImage(path: existingRecipe.imagePath!)
                 updated.imagePath = nil
@@ -172,7 +176,7 @@ struct AddRecipeView: View {
             let recipeId = UUID()
             var imagePath: String?
             if let imageData {
-                imagePath = try? await store.saveImage(imageData, for: recipeId)
+                imagePath = await store.saveImage(imageData, for: recipeId)
             }
             let recipe = UserRecipe(
                 id: recipeId,

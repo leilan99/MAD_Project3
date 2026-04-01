@@ -372,11 +372,12 @@ extension SupabaseService {
 
 extension SupabaseService {
 
-    func fetchSharedRecipes() async throws -> [UserRecipe] {
+    func fetchSharedRecipes(excludingUserId userId: UUID) async throws -> [UserRecipe] {
         let recipeRows: [UserRecipeRow] = try await client
             .from("user_recipes")
             .select()
             .eq("shared", value: true)
+            .neq("user_id", value: userId)
             .execute()
             .value
 

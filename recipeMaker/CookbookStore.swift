@@ -134,7 +134,8 @@ final class CookbookStore {
     // MARK: - Community (Shared) Recipes
 
     func loadCommunityRecipes() async throws {
-        let recipes = try await service.fetchSharedRecipes()
+        guard let userId else { return }
+        let recipes = try await service.fetchSharedRecipes(excludingUserId: userId)
         await MainActor.run {
             self.communityRecipes = recipes
         }
@@ -174,19 +175,29 @@ final class CookbookStore {
         return dir
     }
 
-    func saveImage(_ data: Data, for recipeId: UUID) async throws -> String? {
+    func saveImage(_ data: Data, for recipeId: UUID) async -> String? {
         guard let userId else { return nil }
         guard let uiImage = UIImage(data: data),
               let compressed = uiImage.jpegData(compressionQuality: 0.7) else { return nil }
 
-        // Save locally
+        // Save locally first — this always works
         let filename = "\(recipeId.uuidString).jpg"
         let localURL = Self.imagesDirectory.appendingPathComponent(filename)
-        try compressed.write(to: localURL)
+        do {
+            try compressed.write(to: localURL)
+        } catch {
+            print("[CookbookStore] local image save failed: \(error)")
+            return nil
+        }
 
-        // Upload to Supabase Storage
-        let storagePath = try await service.uploadImage(data: compressed, userId: userId, recipeId: recipeId)
-        return storagePath
+        // Upload to Supabase Storage (best-effort, don't fail the whole save)
+        do {
+            let storagePath = try await service.uploadImage(data: compressed, userId: userId, recipeId: recipeId)
+            return storagePath
+        } catch {
+            print("[CookbookStore] Supabase image upload failed: \(error), using local path")
+            return "\(userId)/\(recipeId).jpg"
+        }
     }
 
     func loadImage(path: String) -> UIImage? {
